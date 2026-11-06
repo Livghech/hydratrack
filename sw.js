@@ -1,6 +1,81 @@
-const C='hydratrack-v1',F=['./','index.html','manifest.json','icon-192.png','icon-512.png','icon-180.png'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F)));self.skipWaiting()});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim()});
-self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;
- e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(n=>{if(n.ok&&new URL(e.request.url).origin===location.origin){const k=n.clone();caches.open(C).then(c=>c.put(e.request,k))}return n}).catch(()=>caches.match('index.html'))))});
-self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil(clients.matchAll({type:'window'}).then(l=>l.length?l[0].focus():clients.openWindow('./')))});
+
+const CACHE_NAME = 'hydratrack-v2';
+
+const FILES = [
+  './',
+  './index.html',
+  './manifest.json'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(FILES))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(key => key !== CACHE_NAME)
+          .map(key => caches.delete(key))
+      )
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+
+  if (url.origin !== self.location.origin) return;
+
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) return cached;
+
+      return fetch(request).then(response => {
+        if (response.ok) {
+          const copy = response.clone();
+
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, copy);
+          });
+        }
+
+        return response;
+      }).catch(() => {
+        if (request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+
+        return new Response('', { status: 503 });
+      });
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+
+  event.waitUntil(
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then(windows => {
+      for (const client of windows) {
+        if ('focus' in client) {
+          return client.focus();
+        }
+      }
+
+      return clients.openWindow('./');
+    })
+  );
+});
