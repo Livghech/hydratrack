@@ -96,7 +96,7 @@ button:hover{border-color:var(--pri)}button:focus-visible,input:focus-visible,se
         <label class="mut">Every<select id="int" onchange="saveRem()"><option value="30">30 min</option><option value="60">1 hour</option><option value="90">90 min</option><option value="120">2 hours</option></select></label>
       </div>
       <button onclick="testRem()" style="width:100%">Send test reminder</button>
-      <p class="mut" style="margin:8px 0 0">Reminders only run between wake and sleep, skip when you're ahead, and stop at your goal. Keep this tab open for browser alerts.</p>
+      <p class="mut" style="margin:8px 0 0">Reminders only run between wake and sleep, skip when you're ahead, and stop at your goal. Reminders work while the app is open or in the background. They can't be sent when the app is fully closed.</p>
     </section>
 
     <section class="card">
@@ -206,11 +206,14 @@ function notify(title,body){toast(body);say(body);
   if('Notification' in window&&Notification.permission==='granted'){const o={body,icon:'icon-192.png'};
     (navigator.serviceWorker?navigator.serviceWorker.ready.then(r=>r.showNotification(title,o)):Promise.reject()).catch(()=>{try{new Notification(title,o)}catch(e){}})}}
 function toggleRem(){S.remind=$('remOn').checked;S.lastRem=Date.now();
-  if(S.remind&&'Notification' in window&&Notification.permission!=='granted')
+  if(S.remind&&!('Notification' in window))toast('Phone alerts aren\'t available here. On iPhone, add the app to your Home Screen first.');
+  else if(S.remind&&Notification.permission!=='granted')
     Notification.requestPermission().then(r=>{if(r!=='granted')toast('Browser alerts blocked. Reminders will show inside the app.')});
   else toast(S.remind?'Reminders on':'Reminders off');render()}
 function saveRem(){S.wake=$('wake').value||'07:00';S.sleep=$('sleep').value||'22:00';S.interval=+$('int').value;S.lastRem=Date.now();render()}
-function testRem(){notify(`${S.name} says hi 💧`,`${S.name} is thirsty! Time for a glass of water.`)}
+async function testRem(){
+  if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission();
+  notify(`${S.name} says hi 💧`,`${S.name} is thirsty! Time for a glass of water.`)}
 function tick(){
   if(rollover()){render(true);return}
   if(!S.remind||S.cur>=S.goal||!inWin()||Date.now()-S.lastRem<S.interval*6e4)return;
